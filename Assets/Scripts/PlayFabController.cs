@@ -3,7 +3,7 @@ using PlayFab;
 using PlayFab.ClientModels;
 using System.Collections.Generic;
 using UnityEngine;
-
+using PlayFab.Json;
 public class PlayFabController : MonoBehaviour
 {
 
@@ -217,6 +217,33 @@ void OnGetStatistics(GetPlayerStatisticsResult result)
         }
     }
 }
+// Build the request object and access the API
+public void StartCloudUpdatePlayerStats()
+{
+    PlayFabClientAPI.ExecuteCloudScript(new ExecuteCloudScriptRequest()
+    {
+        FunctionName = "UpdatePlayerStats", // Arbitrary function name (must exist in your uploaded cloud.js file)
+        FunctionParameter = new { level = playerLevel , PlayerHighScore = playerHighScore ,playerHealth = playerHealth }, // The parameter provided to your function
+        GeneratePlayStreamEvent = true, // Optional - Shows this event in PlayStream
+    }, OnCloudUpdatePlayerStats, OnErrorShared);
+}
+// OnCloudUpdatePlayerStats defined in the next code block
+
+private void OnCloudUpdatePlayerStats(ExecuteCloudScriptResult result) {
+    // CloudScript returns arbitrary results, so you have to evaluate them one step and one parameter at a time
+    Debug.Log(PlayFabSimpleJson.SerializeObject(result.FunctionResult));
+    JsonObject jsonResult = (JsonObject)result.FunctionResult;
+    object messageValue;
+    jsonResult.TryGetValue("messageValue", out messageValue); // note how "messageValue" directly corresponds to the JSON values set in CloudScript
+    Debug.Log((string)messageValue);
+}
+
+private void OnErrorShared(PlayFabError error)
+{
+    Debug.Log(error.GenerateErrorReport());
+}
+
+
 
 #endregion PlayerStats
 

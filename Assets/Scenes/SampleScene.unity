@@ -578,7 +578,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 163879142}
         m_TargetAssemblyTypeName: PlayFabController, Assembly-CSharp
-        m_MethodName: SetStats
+        m_MethodName: StartCloudUpdatePlayerStats
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
