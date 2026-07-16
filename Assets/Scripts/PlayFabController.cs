@@ -10,7 +10,8 @@ public class PlayFabController : MonoBehaviour
 public static PlayFabController PFC;
     private string userEmail;
     private string userPassword;
-    private string userName;    
+    private string userName;   
+    private string myID; 
     public GameObject loginPanel;
       public GameObject addLoginPanel;
         public GameObject recoveryButton;
@@ -73,12 +74,17 @@ if(PlayerPrefs.HasKey("EMAIL"))
      GetStatistics();
     loginPanel.SetActive(false);
     recoveryButton.SetActive(false);
+
+    myID = result.PlayFabId;
+    GetPlayerData();
     }
     private void OnLoginMobileSuccess(LoginResult result)
     {
         Debug.Log("Congratulations, you made your first successful API call!");
          GetStatistics();
     loginPanel.SetActive(false);
+    myID = result.PlayFabId;
+    GetPlayerData();
     }
     
     private void OnRegisterSuccess(RegisterPlayFabUserResult result)
@@ -86,10 +92,20 @@ if(PlayerPrefs.HasKey("EMAIL"))
         Debug.Log("Congratulations, you made your first successful API call!");
     PlayerPrefs.SetString("EMAIL", userEmail);
     PlayerPrefs.SetString("PASSWORD", userPassword);
+
+PlayFabClientAPI.UpdateUserTitleDisplayName(new UpdateUserTitleDisplayNameRequest { DisplayName = userName }, OnDisplayNameUpdate, OnLoginMobileFailure);
+
      GetStatistics();
     loginPanel.SetActive(false);
+    myID = result.PlayFabId;
+    GetPlayerData();
     }
 
+
+void OnDisplayNameUpdate(UpdateUserTitleDisplayNameResult result)
+    {
+        Debug.Log("Display name updated successfully");
+    }
     private void OnLoginFailure(PlayFabError error)
     {
      var registerRequest = new RegisterPlayFabUserRequest { Email = userEmail, Password = userPassword, Username = userName, RequireBothUsernameAndEmail = false };
@@ -229,7 +245,7 @@ public void StartCloudUpdatePlayerStats()
 }
 // OnCloudUpdatePlayerStats defined in the next code block
 
-private void OnCloudUpdatePlayerStats(ExecuteCloudScriptResult result) {
+private static void OnCloudUpdatePlayerStats(ExecuteCloudScriptResult result) {
     // CloudScript returns arbitrary results, so you have to evaluate them one step and one parameter at a time
     Debug.Log(PlayFabSimpleJson.SerializeObject(result.FunctionResult));
     JsonObject jsonResult = (JsonObject)result.FunctionResult;
@@ -246,5 +262,87 @@ private void OnErrorShared(PlayFabError error)
 
 
 #endregion PlayerStats
+public GameObject leaderboardPanel;
+public GameObject leaderboardListingPrefab;
+public Transform leaderboardContainer;
+#region playerLeaderboard
+public void GetLeaderboarder()
+{
+    var requestLeaderboard = new GetLeaderboardRequest { StatisticName = "playerHighScore", StartPosition = 0, MaxResultsCount = 10 };
+    PlayFabClientAPI.GetLeaderboard(requestLeaderboard, OnGetLeaderboard, OnErrorLeaderboard);
+}
 
+public void OnGetLeaderboard(GetLeaderboardResult result)
+{
+    leaderboardPanel.SetActive(true);
+    Debug.Log("Leaderboard:");
+    foreach (var item in result.Leaderboard)
+    {
+        GameObject listingObj = Instantiate(leaderboardListingPrefab, leaderboardContainer);
+        LeaderboardListing listing = listingObj.GetComponent<LeaderboardListing>();
+        listing.playerName.text = item.DisplayName;
+        listing.playerScore.text = item.StatValue.ToString();
+        Debug.Log(string.Format("Position: {0} | PlayFabId: {1} | DisplayName: {2} | StatValue: {3}", item.Position, item.PlayFabId, item.DisplayName, item.StatValue));
+    }
+}
+
+public void OnErrorLeaderboard(PlayFabError error)
+{
+    Debug.Log(error.GenerateErrorReport());
+}
+
+
+public void CloseLeaderboard()
+{
+    leaderboardPanel.SetActive(false);
+    for (int i = leaderboardContainer.childCount - 1; i >= 0; i--)
+    {
+        Destroy(leaderboardContainer.GetChild(i).gameObject);
+    }
+}
+
+
+
+#endregion
+#region PlayerData
+public void GetPlayerData()
+{
+    PlayFabClientAPI.GetUserData(new GetUserDataRequest()
+    {
+        PlayFabId = myID,
+        Keys = null 
+    }, UserDataSuccess, OnErrorLeaderboard);
+}
+
+ void UserDataSuccess(GetUserDataResult result)
+{
+    if (result.Data == null || !result.Data.ContainsKey("Skins"))
+    {
+        Debug.Log("No user data available");
+        
+    }
+    else
+    {
+        Debug.Log("User data retrieved successfully");
+        PersistentData.PD.SkinStringToData(result.Data["Skins"].Value);
+    }
+
+    
+}
+
+public void SetUserData(string skinData)
+{
+
+PlayFabClientAPI.UpdateUserData(new UpdateUserDataRequest()  
+ {
+        Data = new Dictionary<string, string> {
+            {"Skins", skinData}
+        }
+    }, SetDataSuccess,OnErrorLeaderboard);}
+
+    void SetDataSuccess(UpdateUserDataResult result)
+    {
+        Debug.Log(result.DataVersion);
+    }
+#endregion
 }
