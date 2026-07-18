@@ -4,6 +4,7 @@ using PlayFab.ClientModels;
 using System.Collections.Generic;
 using UnityEngine;
 using PlayFab.Json;
+using System.Collections;
 public class PlayFabController : MonoBehaviour
 {
 
@@ -16,6 +17,15 @@ public static PlayFabController PFC;
       public GameObject addLoginPanel;
         public GameObject recoveryButton;
 
+void DisplayPlayFabError(PlayFabError error)
+ {
+    Debug.LogError(error.GenerateErrorReport());
+ }
+
+void DisplayError(string error)
+{
+    Debug.LogError(error);
+}
 
         private void OnEnable()
     {
@@ -113,7 +123,7 @@ void OnDisplayNameUpdate(UpdateUserTitleDisplayNameResult result)
     }
         private void OnLoginMobileFailure(PlayFabError error)
     {
-             Debug.Log(error.GenerateErrorReport());
+             DisplayPlayFabError(error);
     }
 
     private void OnRegisterFailure(PlayFabError error)
@@ -160,7 +170,7 @@ void OnDisplayNameUpdate(UpdateUserTitleDisplayNameResult result)
      public void OnClickAddLogin()
     {
         var addLoginRequest = new AddUsernamePasswordRequest { Email = userEmail, Password = userPassword, Username = userName };
-        PlayFabClientAPI.AddUsernamePassword(addLoginRequest, OnAddLoginSuccess, OnRegisterFailure);
+        PlayFabClientAPI.AddUsernamePassword(addLoginRequest, OnAddLoginSuccess, DisplayPlayFabError);
     }
 
         private void OnAddLoginSuccess(AddUsernamePasswordResult result)
@@ -345,4 +355,107 @@ PlayFabClientAPI.UpdateUserData(new UpdateUserDataRequest()
         Debug.Log(result.DataVersion);
     }
 #endregion
+#region FriendList
+
+[SerializeField] Transform friendScrollView;
+List<FriendInfo> myFriends;
+
+void DisplayFriends(List<FriendInfo> friendCache)
+{
+    foreach (FriendInfo f in friendCache)
+    {
+        bool isFound = false;
+        if(myFriends != null)
+            {
+                foreach(FriendInfo g in myFriends)
+            {
+                if(f.FriendPlayFabId == g.FriendPlayFabId)
+                
+                    isFound = true;
+                 
+                } 
+            }
+       
+                if(isFound == false)
+                {
+                        GameObject listing = Instantiate(leaderboardListingPrefab, friendScrollView);
+        LeaderboardListing tempListing = listing.GetComponent<LeaderboardListing>();
+        // Debug.Log(tempListing.playerName);
+        // Debug.Log(f.TitleDisplayName);
+        tempListing.playerName.text = f.TitleDisplayName;
+                }
+            
+    
+    }
+    myFriends = friendCache;
+}
+
+IEnumerator waitForFriends()
+{
+    yield return new WaitForSeconds(2f);
+    GetFriends();
+}
+
+public void RunWaitForFriends()
+{
+    StartCoroutine(waitForFriends());
+}
+public void InputDriendID(string friendId)
+{
+    friendSearch = friendId;
+}
+
+public void SubmitFriendRequest()
+{
+    AddFriend(FriendIdType.PlayFabId, friendSearch);
+}
+
+public void OpenCloseFriend()
+{
+    FriendPanel.SetActive(!FriendPanel.activeInHierarchy);
+}
+List<FriendInfo> _friends = null;
+
+public void GetFriends()
+{
+    PlayFabClientAPI.GetFriendsList(
+        new GetFriendsListRequest(),
+        result =>
+        {
+            _friends = result.Friends;
+            DisplayFriends(_friends);
+        },
+        DisplayPlayFabError
+    );
+}
+
+string friendSearch;
+[SerializeField] GameObject FriendPanel;
+
+enum FriendIdType { PlayFabId, Username, Email, DisplayName };
+
+void AddFriend(FriendIdType idType, string friendId) {
+    var request = new AddFriendRequest();
+    switch (idType) {
+        case FriendIdType.PlayFabId:
+            request.FriendPlayFabId = friendId;
+            break;
+        case FriendIdType.Username:
+            request.FriendUsername = friendId;
+            break;
+        case FriendIdType.Email:
+            request.FriendEmail = friendId;
+            break;
+        case FriendIdType.DisplayName:
+            request.FriendTitleDisplayName = friendId;
+            break;
+    }
+    // Execute request and update friends when we are done
+    PlayFabClientAPI.AddFriend(request, result => {
+        Debug.Log("Friend added successfully!");
+    }, DisplayPlayFabError);
+}
+#endregion
+
+
 }
